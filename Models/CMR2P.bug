@@ -1,0 +1,95 @@
+###############################################
+##                                           ##
+##   M O D E L      D E S C R I P T I O N    ##
+##                                           ##
+###############################################
+
+# Model Name: CMR2P
+
+# 1. Capture-recapture model (JS with Restricted Occupancy parametrization, by Royle and Dorazio, 2008)
+# 2. Robust data collection design
+# 3. State Space formulation separating state and observation processes
+# 4. Differentiation between physical capture and observation probabilities in the model
+# 5. Survival probability may vary within time
+# 6. No individual capture heterogeneity
+
+###############################################
+
+model {
+  
+  #################################
+  # Define priors and constraints #
+  #################################
+  
+  p1 ~ dbeta(1, 1)  # Capture
+  p2 ~ dbeta(1, 1) # Observation probabilities
+  
+  for (t in 1:tot.occ-1){
+    phi[t] ~ dbeta(1, 1)} # Survival probabilities
+  
+  for (t in 1:tot.occ){
+    gamma[t] ~ dunif(0, 1)}  # Entry probabilities
+  
+  
+  # Likelihood
+  
+  #####################    
+  # CAPTURE-RECAPTURE #
+  #####################
+  
+  # First occasion
+  # State process
+  
+  for (i in 1:M){
+    z[i,1] ~ dbern(gamma[1])
+    
+    # Observation process (capture)
+    
+    mu1[i] <- z[i,1] * p1
+    CH[i,1] ~ dbern(mu1[i])
+    
+    # Subsequent occasions
+    # State Process
+    
+    for (t in 2:tot.occ){
+      q[i,t-1] <- 1-z[i,t-1]    # Availability for recruitment
+      mu2[i,t] <- phi[t-1] * z[i,t-1] + gamma[t] * prod(q[i,1:(t-1)]) # Argument for the Bernoulli distribution 
+      z[i,t] ~ dbern(mu2[i,t])
+      
+      # Observation process (resight)
+      
+      mu3[i,t] <- z[i,t] * p1 * (1-prod(CH[i,1:(t-1)])) + z[i,t] * p2 * prod(CH[i,1:(t-1)]) # Argument for the Bernoulli distribution
+      CH[i,t] ~ dbern(mu3[i,t])}} #i 
+  
+  ###########################################    
+  # Calculate derived population parameters #
+  ###########################################    
+  
+  for (t in 1:tot.occ){
+    qgamma[t] <- 1-gamma[t]
+  }
+  cprob[1] <- gamma[1]
+  for (t in 2:tot.occ){
+    cprob[t] <- gamma[t] * prod(qgamma[1:(t-1)])
+  } #t
+  omega <- sum(cprob[])            # Inclusion probability
+  for (t in 1:tot.occ){
+    b[t] <- cprob[t] / omega         # Entry probability
+  } #t
+  for (i in 1:M){
+    recruit[i,1] <- z[i,1]
+    for (t in 2:tot.occ){
+      recruit[i,t] <- (1-z[i,t-1]) * z[i,t]
+    } #t
+  } #i
+  for (t in 1:tot.occ){
+    N[t] <- sum(z[1:M,t])        # Actual population size
+    B[t] <- sum(recruit[1:M,t])
+  } #t
+  for (i in 1:M){
+    Nind[i] <- sum(z[i,1:tot.occ])
+    Nalive[i] <- 1-equals(Nind[i], 0)
+  } #i
+  S <- sum(Nalive[])         # Superpopulation size
+  
+} # End of Model

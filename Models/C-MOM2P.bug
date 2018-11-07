@@ -1,0 +1,85 @@
+###############################################
+##                                           ##
+##   M O D E L      D E S C R I P T I O N    ##
+##                                           ##
+###############################################
+
+# Model Name: C-MOM2P
+
+# 1. Integrated Population Model: Capture-recapture and counting datasets
+# 2. Robust data collection design
+# 3. State Space formulation separating state and observation processes
+# 4. Differentiation between physical capture and observation probabilities in the model
+# 5. Survival probability may vary within time
+# 6. No individual capture heterogeneity
+
+###############################################
+
+model {
+  
+  #################################
+  # Define priors and constraints #
+  #################################
+  
+  p1 ~ dbeta(1, 1)  # Capture
+  p2 ~ dbeta(1, 1) # Observation probabilities
+  
+  for (t in 1:tot.occ-1){
+    phi[t] ~ dbeta(1, 1)} # Survival probabilities
+  
+  for (t in 1:tot.occ){
+    gamma[t] ~ dunif(0, 1)  # Entry probabilities
+    B[t] ~ dpois(3)} # Newborns
+  c <- COUNT[1]
+  N[1] ~ dpois(c)I(COUNT[1],) # Population
+  
+  # Likelihood
+  
+  #####################    
+  # CAPTURE-RECAPTURE #
+  #####################
+  
+  # First occasion
+  # State process
+  
+  for (i in 1:M){
+    z[i,1] ~ dbern(gamma[1])
+    
+    # Observation process (capture)
+    
+    mu1[i] <- z[i,1] * p1
+    CH[i,1] ~ dbern(mu1[i])
+    
+    # Subsequent occasions
+    # State Process
+    
+    for (t in 2:tot.occ){
+      q[i,t-1] <- 1-z[i,t-1]    # Availability for recruitment
+      mu2[i,t] <- phi[t-1] * z[i,t-1] + gamma[t] * prod(q[i,1:(t-1)])  # Argument for the Bernoulli distribution
+      z[i,t] ~ dbern(mu2[i,t])
+      
+      # Observation process (resight)
+      
+      mu3[i,t] <- z[i,t] * p1 * (1-prod(CH[i,1:(t-1)])) + z[i,t] * p2 * prod(CH[i,1:(t-1)]) # Argument for the Bernoulli distribution
+      CH[i,t] ~ dbern(mu3[i,t])}} #i 
+  
+  ##########
+  # COUNTS #
+  ##########
+  
+  # State Process
+  
+  for (t in 1:(tot.occ-1)){
+    N[t+1] <- N[t] + B[t] - (N[t]*(1-phi[t]))}
+  
+  # Observation process 
+  
+  for (t in 1:tot.occ){
+    cnt[t] <- N[t] * p2
+    COUNT[t] ~ dpois(cnt[t])} 
+  
+  # Calculate derived population parameters
+  S <- sum(B[1:tot.occ])+N[1]
+  
+  
+} # End of Model
